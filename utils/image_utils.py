@@ -143,6 +143,17 @@ def detect_face_box(pil_image):
         logger.exception("Face detection failed.")
         return None
 
+_rembg_session = None
+
+
+def _get_rembg_session():
+    global _rembg_session
+    if _rembg_session is None:
+        from rembg import new_session
+        _rembg_session = new_session("u2net")
+    return _rembg_session
+
+
 def remove_background(pil_image):
     """
     Attempt to remove the background using rembg, returning an RGBA image
@@ -151,9 +162,10 @@ def remove_background(pil_image):
     """
     try:
         from rembg import remove
+        session = _get_rembg_session()
         buf = io.BytesIO()
         pil_image.save(buf, format="PNG")
-        result_bytes = remove(buf.getvalue())
+        result_bytes = remove(buf.getvalue(), session=session)
         result = Image.open(io.BytesIO(result_bytes)).convert("RGBA")
         return result
     except Exception:
