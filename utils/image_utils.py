@@ -50,11 +50,12 @@ def _get_face_cascade():
         cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         cascade = cv2.CascadeClassifier(cascade_path)
         if cascade.empty():
+            logger.warning("Face cascade file loaded empty (path: %s); falling back to center-crop.", cascade_path)
             _face_cascade = False
         else:
             _face_cascade = cascade
     except Exception:
-        logger.warning("OpenCV face cascade unavailable; falling back to center-crop.")
+        logger.exception("OpenCV face cascade unavailable; falling back to center-crop.")
         _face_cascade = False
     return _face_cascade
 
@@ -156,7 +157,7 @@ def remove_background(pil_image):
         result = Image.open(io.BytesIO(result_bytes)).convert("RGBA")
         return result
     except Exception:
-        logger.warning("Background removal unavailable or failed; using original background.")
+        logger.exception("Background removal unavailable or failed; using original background.")
         return None
 
 
