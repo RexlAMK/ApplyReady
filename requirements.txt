@@ -1,0 +1,16 @@
+streamlit>=1.32
+Pillow>=10.0
+numpy>=1.24
+opencv-python-headless>=4.8
+python-docx>=1.1
+reportlab>=4.0
+pypdf>=4.0
+PyMuPDF>=1.23
+requests>=2.31
+
+# NOTE: rembg (background removal) is intentionally NOT listed here.
+# It pulls in scikit-image/numba versions that conflict with Colab's
+# preinstalled GPU/data-science stack (cudf, cuml, cucim, pytensor).
+# The app works fully without it -- background removal just falls back
+# to the original background automatically. If you want to try it,
+# install it separately: pip install -r requirements-optional.txt

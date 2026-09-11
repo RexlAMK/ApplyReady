@@ -1,0 +1,10 @@
+# Optional. Enables true AI background removal for the passport photo tool.
+# Install separately from requirements.txt because it can pull in
+# scikit-image/numba versions that conflict with Colab's preinstalled
+# GPU/data-science stack (cudf, cuml, cucim, pytensor). The app works
+# fully without this -- background removal automatically falls back to
+# keeping the original background if rembg is not installed.
+#
+# Install with: pip install -r requirements-optional.txt
+
+rembg>=2.0.57
