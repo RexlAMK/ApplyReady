@@ -7,6 +7,7 @@ reportlab>=4.0
 pypdf>=4.0
 PyMuPDF>=1.23
 requests>=2.31
+rembg>=2.0.57
 
 # NOTE: rembg (background removal) is intentionally NOT listed here.
 # It pulls in scikit-image/numba versions that conflict with Colab's
