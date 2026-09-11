@@ -96,18 +96,51 @@ def detect_face_box(pil_image):
         return None
     try:
         import cv2
+
         arr = np.array(pil_image.convert("L"))
-        faces = cascade.detectMultiScale(arr, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+
+        # Haar cascades are very sensitive to uneven lighting/exposure --
+        # normalizing contrast first catches a lot of "no face detected"
+        # cases on real phone photos.
+        arr = cv2.equalizeHist(arr)
+
+        # Detect on a modestly-sized copy for speed/consistency, then scale
+        # the box back up to the original resolution.
+        h, w = arr.shape[:2]
+        scale = 1.0
+        max_dim = 1000
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            arr_small = cv2.resize(arr, (int(w * scale), int(h * scale)))
+        else:
+            arr_small = arr
+
+        # Try a couple of parameter sets, strict to lenient, and stop at
+        # the first that finds anything.
+        attempts = [
+            dict(scaleFactor=1.1, minNeighbors=5, minSize=(60, 60)),
+            dict(scaleFactor=1.1, minNeighbors=3, minSize=(40, 40)),
+            dict(scaleFactor=1.05, minNeighbors=3, minSize=(30, 30)),
+        ]
+
+        faces = ()
+        for params in attempts:
+            faces = cascade.detectMultiScale(arr_small, **params)
+            if len(faces) > 0:
+                break
+
         if len(faces) == 0:
             return None
+
         # pick the largest detected face
         faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-        x, y, w, h = faces[0]
-        return int(x), int(y), int(w), int(h)
+        x, y, fw, fh = faces[0]
+        if scale != 1.0:
+            x, y, fw, fh = (v / scale for v in (x, y, fw, fh))
+        return int(x), int(y), int(fw), int(fh)
     except Exception:
         logger.exception("Face detection failed.")
         return None
-
 
 def remove_background(pil_image):
     """
