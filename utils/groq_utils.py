@@ -58,6 +58,27 @@ def get_preferred_model():
 
 
 def get_api_key():
+    try:
+        import streamlit as st
+        user_key = st.session_state.get("user_groq_key")
+        if user_key:
+            return str(user_key).strip()
+    except Exception:
+        pass
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if api_key:
+        return api_key.strip()
+
+    try:
+        import streamlit as st
+        api_key = st.secrets["GROQ_API_KEY"]
+        if api_key:
+            return str(api_key).strip()
+    except Exception:
+        pass
+
+    return None
     """
     Resolve the Groq API key from environment variable first, then
     Streamlit secrets. Returns None if not found anywhere (never raises).
