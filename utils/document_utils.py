@@ -76,6 +76,9 @@ def _is_horizontal_rule(line):
     return len(compact) >= 3 and len(set(compact)) == 1 and compact[0] in "-*_"
 
 
+_BOILERPLATE_RE = re.compile(r"^references\s+available\s+upon\s+request\.?\*?$", re.IGNORECASE)
+
+
 def clean_line(raw_line):
     line = raw_line.strip()
     if not line:
@@ -90,9 +93,12 @@ def clean_line(raw_line):
     bullet_match = _BULLET_LINE_RE.match(line)
     if bullet_match:
         content = line[bullet_match.end():].strip()
-        if not content:
+        if not content or _BOILERPLATE_RE.match(content):
             return "blank", ""
         return "bullet", content
+
+    if _BOILERPLATE_RE.match(line):
+        return "blank", ""
 
     return "text", line
 
@@ -294,7 +300,7 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
                                     leading=pt(13), textColor=blue, spaceBefore=pt(6), spaceAfter=pt(1.5))
     body_style = ParagraphStyle("Body", fontName="Helvetica", fontSize=pt(9.3),
                                  leading=pt(12.2), textColor=dark, spaceAfter=pt(1.5))
-    bullet_style = ParagraphStyle("Bullet", parent=body_style, leftIndent=10, bulletIndent=0,
+    bullet_style = ParagraphStyle("Bullet", parent=body_style, leftIndent=13, bulletIndent=0,
                                    spaceAfter=pt(1))
     label_bold_style = ParagraphStyle("LabelBold", parent=body_style, fontName="Helvetica-Bold")
     date_style = ParagraphStyle("Date", parent=body_style, alignment=TA_RIGHT, textColor=muted)
@@ -349,10 +355,13 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
         story.append(Paragraph(heading.upper(), heading_style))
         story.append(HRFlowable(width="100%", thickness=0.6, color=blue, spaceAfter=pt(3)))
 
-    def render_items(items, indent_meta=True):
+    def render_items(items, indent_meta=True, bold_titles=False):
         for kind, content in _merge_standalone_date_lines(items):
             if kind == "bullet":
-                story.append(Paragraph(f"&bull;&nbsp;&nbsp;{_escape_html(content)}", bullet_style))
+                # Real hanging-indent bullet (bulletText), so wrapped lines
+                # align under the bullet's text instead of back under the
+                # bullet glyph itself.
+                story.append(Paragraph(_escape_html(content), bullet_style, bulletText="\u2022"))
                 continue
             is_meta = bool(re.match(r"^(GPA|Relevant coursework)\s*:", content, re.IGNORECASE))
             label, date = (content, None) if is_meta else split_trailing_date(content)
@@ -371,6 +380,11 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
                 story.append(row)
             elif is_meta and indent_meta:
                 story.append(Paragraph(_escape_html(content), small_style))
+            elif bold_titles:
+                # Keep job/degree title lines visually consistent (bold)
+                # whether or not this particular entry has a trailing date,
+                # so entries within the same section don't look mismatched.
+                story.append(Paragraph(_escape_html(content), label_bold_style))
             else:
                 story.append(Paragraph(_escape_html(content), body_style))
 
@@ -389,8 +403,8 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
         for row in rows:
             while len(row) < cols:
                 row.append("")
-        cell_style = ParagraphStyle("SkillCell", parent=body_style, spaceAfter=pt(3))
-        table_data = [[Paragraph(f"&bull;&nbsp;{_escape_html(c)}" if c else "", cell_style) for c in row] for row in rows]
+        cell_style = ParagraphStyle("SkillCell", parent=body_style, leftIndent=10, spaceAfter=pt(3))
+        table_data = [[Paragraph(_escape_html(c), cell_style, bulletText="\u2022") if c else Paragraph("", cell_style) for c in row] for row in rows]
         col_width = content_width / cols
         table = Table(table_data, colWidths=[col_width] * cols)
         table.setStyle(TableStyle([
@@ -407,7 +421,7 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
         if heading in _SKILLS_KEYS:
             render_skills(items)
         else:
-            render_items(items)
+            render_items(items, bold_titles=(heading in _EDUCATION_KEYS or heading in _EXPERIENCE_KEYS))
 
     # Every remaining section (Certifications, Projects, Key Achievements,
     # Languages, etc.) gets its own real heading + bulleted content, in the
@@ -419,7 +433,7 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
         if heading in _SKILLS_KEYS:
             render_skills(items)
         else:
-            render_items(items)
+            render_items(items, bold_titles=(heading in _EDUCATION_KEYS or heading in _EXPERIENCE_KEYS))
 
     return story
 
