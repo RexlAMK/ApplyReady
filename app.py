@@ -206,24 +206,39 @@ with st.sidebar:
 
     st.markdown("### 🔑 Groq API Key")
 
-user_groq_key = st.text_input(
-    "Enter your own Groq API key",
-    type="password",
-    help="Your key is used only for your current session."
-)
+    user_groq_key = st.text_input(
+        "Enter your own Groq API key",
+        type="password",
+        key="groq_key_input",
+        help="Your key is used for your current app session."
+    )
 
-if user_groq_key:
-    st.session_state["user_groq_key"] = user_groq_key
-    
-    choice = st.radio("Navigate", PAGES, index=PAGES.index(st.session_state.page), label_visibility="collapsed")
+    if user_groq_key:
+        st.session_state["user_groq_key"] = user_groq_key.strip()
+
+    st.markdown("---")
+
+    choice = st.radio(
+        "Navigate",
+        PAGES,
+        index=PAGES.index(st.session_state.page),
+        label_visibility="collapsed"
+    )
+
     if choice != st.session_state.page:
         st.session_state.page = choice
+
     st.markdown("---")
+
     if groq_utils.is_configured():
         st.success("Groq AI: Connected", icon="✅")
     else:
         st.warning("Groq AI: Not configured", icon="⚠️")
-        st.caption("Set GROQ_API_KEY to enable AI features. Core tools still work without it.")
+        st.caption(
+            "Enter your Groq API key above to enable AI features. "
+            "Core tools still work without it."
+        )
+
     st.markdown("---")
     st.caption("Built with Python • Streamlit • Groq AI")
 
