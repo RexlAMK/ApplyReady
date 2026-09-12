@@ -203,6 +203,18 @@ with st.sidebar:
     st.markdown("### 🚀 ApplyReady AI")
     st.caption("From your photo and profile to a job-ready application.")
     st.markdown("---")
+
+    st.markdown("### 🔑 Groq API Key")
+
+user_groq_key = st.text_input(
+    "Enter your own Groq API key",
+    type="password",
+    help="Your key is used only for your current session."
+)
+
+if user_groq_key:
+    st.session_state["user_groq_key"] = user_groq_key
+    
     choice = st.radio("Navigate", PAGES, index=PAGES.index(st.session_state.page), label_visibility="collapsed")
     if choice != st.session_state.page:
         st.session_state.page = choice
