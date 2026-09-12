@@ -26,7 +26,15 @@ SECTION_HEADINGS = {
 _PROFILE_KEYS = {"PROFESSIONAL SUMMARY", "SUMMARY", "PROFILE", "OBJECTIVE"}
 _EDUCATION_KEYS = {"EDUCATION"}
 _EXPERIENCE_KEYS = {"EXPERIENCE", "WORK EXPERIENCE", "PROFESSIONAL EXPERIENCE", "INTERNSHIPS"}
-_SKILLS_KEYS = {"SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE COMPETENCIES"}
+_SKILLS_KEYS = {"SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE COMPETENCIES", "CORE SKILLS"}
+
+
+def _is_skills_heading(heading):
+    """Broader than an exact-match set: AI output uses many section-name
+    variants ('Core Skills', 'Key Skills & Tools', etc.) that all still
+    mean 'render as the compact multi-column skills grid', not a wall of
+    full-width bullet lines that eats far more vertical space."""
+    return heading in _SKILLS_KEYS or "SKILL" in heading
 
 PASSPORT_BLUE_HEX = "#2f6feb"
 DARK_TEXT_HEX = "#1a1a1a"
@@ -288,24 +296,36 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
     muted = colors.HexColor(MUTED_TEXT_HEX)
 
     def pt(base):
+        """For font sizes / line-height only -- keeps a readability floor
+        so text never becomes illegibly small."""
         return max(7.0, base * scale)
 
+    def sp(base):
+        """For spacing (spaceBefore/spaceAfter/Spacer/HRFlowable gaps) --
+        must scale all the way down with `scale`, unlike font sizes. Reusing
+        the font-floor function here was the actual bug: at scale 0.8, a
+        tiny spaceAfter=1.5 was being floored up to 7pt (bigger than at
+        scale 1.0!), which fought against the whole point of shrinking to
+        fit one page.
+        """
+        return max(0.4, base * scale)
+
     name_style = ParagraphStyle("Name", fontName="Helvetica-Bold", fontSize=pt(21),
-                                 leading=pt(23), textColor=blue, spaceAfter=1)
+                                 leading=pt(23), textColor=blue, spaceAfter=sp(1))
     title_style = ParagraphStyle("JobTitle", fontName="Helvetica", fontSize=pt(11.5),
-                                  leading=pt(14), textColor=dark, spaceAfter=2)
+                                  leading=pt(14), textColor=dark, spaceAfter=sp(2))
     contact_style = ParagraphStyle("Contact", fontName="Helvetica", fontSize=pt(9),
                                     leading=pt(12), textColor=muted)
     heading_style = ParagraphStyle("SectionHeading", fontName="Helvetica-Bold", fontSize=pt(10.5),
-                                    leading=pt(13), textColor=blue, spaceBefore=pt(6), spaceAfter=pt(1.5))
+                                    leading=pt(13), textColor=blue, spaceBefore=sp(6), spaceAfter=sp(1.5))
     body_style = ParagraphStyle("Body", fontName="Helvetica", fontSize=pt(9.3),
-                                 leading=pt(12.2), textColor=dark, spaceAfter=pt(1.5))
+                                 leading=pt(12.2), textColor=dark, spaceAfter=sp(1.5))
     bullet_style = ParagraphStyle("Bullet", parent=body_style, leftIndent=13, bulletIndent=0,
-                                   spaceAfter=pt(1))
+                                   spaceAfter=sp(1))
     label_bold_style = ParagraphStyle("LabelBold", parent=body_style, fontName="Helvetica-Bold")
     date_style = ParagraphStyle("Date", parent=body_style, alignment=TA_RIGHT, textColor=muted)
     small_style = ParagraphStyle("Small", parent=body_style, fontSize=pt(8.6), textColor=muted,
-                                  spaceAfter=pt(1.5))
+                                  spaceAfter=sp(1.5))
 
     content_width = 7.4 * inch
 
@@ -348,12 +368,12 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
     else:
         story.extend(left_flow)
 
-    story.append(Spacer(1, pt(4)))
-    story.append(HRFlowable(width="100%", thickness=1.1, color=blue, spaceAfter=pt(5)))
+    story.append(Spacer(1, sp(4)))
+    story.append(HRFlowable(width="100%", thickness=1.1, color=blue, spaceAfter=sp(5)))
 
     def render_heading(heading):
         story.append(Paragraph(heading.upper(), heading_style))
-        story.append(HRFlowable(width="100%", thickness=0.6, color=blue, spaceAfter=pt(3)))
+        story.append(HRFlowable(width="100%", thickness=0.6, color=blue, spaceAfter=sp(3)))
 
     def render_items(items, indent_meta=True, bold_titles=False):
         for kind, content in _merge_standalone_date_lines(items):
@@ -366,8 +386,9 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
             is_meta = bool(re.match(r"^(GPA|Relevant coursework)\s*:", content, re.IGNORECASE))
             label, date = (content, None) if is_meta else split_trailing_date(content)
             if date:
+                label_style = label_bold_style if bold_titles else body_style
                 row = Table(
-                    [[Paragraph(_escape_html(label), label_bold_style), Paragraph(_escape_html(date), date_style)]],
+                    [[Paragraph(_escape_html(label), label_style), Paragraph(_escape_html(date), date_style)]],
                     colWidths=[content_width * 0.72, content_width * 0.28],
                 )
                 row.setStyle(TableStyle([
@@ -403,7 +424,7 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
         for row in rows:
             while len(row) < cols:
                 row.append("")
-        cell_style = ParagraphStyle("SkillCell", parent=body_style, leftIndent=10, spaceAfter=pt(3))
+        cell_style = ParagraphStyle("SkillCell", parent=body_style, leftIndent=10, spaceAfter=sp(3))
         table_data = [[Paragraph(_escape_html(c), cell_style, bulletText="\u2022") if c else Paragraph("", cell_style) for c in row] for row in rows]
         col_width = content_width / cols
         table = Table(table_data, colWidths=[col_width] * cols)
@@ -418,10 +439,10 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
 
     for heading, items in ordered_first:
         render_heading(heading)
-        if heading in _SKILLS_KEYS:
+        if _is_skills_heading(heading):
             render_skills(items)
         else:
-            render_items(items, bold_titles=(heading in _EDUCATION_KEYS or heading in _EXPERIENCE_KEYS))
+            render_items(items, bold_titles=(heading in _EXPERIENCE_KEYS))
 
     # Every remaining section (Certifications, Projects, Key Achievements,
     # Languages, etc.) gets its own real heading + bulleted content, in the
@@ -430,10 +451,10 @@ def _build_pdf_story(resume_text, photo_bytes, scale=1.0):
     # instead of matching the resume's visual theme.
     for heading, items in other_sections:
         render_heading(heading)
-        if heading in _SKILLS_KEYS:
+        if _is_skills_heading(heading):
             render_skills(items)
         else:
-            render_items(items, bold_titles=(heading in _EDUCATION_KEYS or heading in _EXPERIENCE_KEYS))
+            render_items(items, bold_titles=(heading in _EXPERIENCE_KEYS))
 
     return story
 
